@@ -2494,9 +2494,24 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     }
 
     parseParenAndDistinguishExpression(canBeArrow: boolean): N.Expression {
-      return super.parseParenAndDistinguishExpression(
+      const list = super.parseParenAndDistinguishExpression(
         canBeArrow && this.state.noArrowAt.indexOf(this.state.start) === -1,
       );
+
+      // Ensure that TypeCastExpressions without parens are not allowed inside SequenceExpressions
+      // e.g. (A, B: T)
+      if (list.type === "SequenceExpression") {
+        const firstTypeCast = list.expressions.find(
+          ({ type, extra }) =>
+            type === "TypeCastExpression" &&
+            (!extra || extra.parenthesized !== true),
+        );
+        if (firstTypeCast) {
+          this.unexpected(firstTypeCast.typeAnnotation.start);
+        }
+      }
+
+      return list;
     }
 
     parseSubscripts(
